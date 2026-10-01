@@ -2,10 +2,15 @@
 
 Brave/Chromium (MV3, Chrome 121+) extension. Keeps the N most recently used tabs loaded (across all windows) and discards the rest with `chrome.tabs.discard`.
 
-Author: OmAr-Kader · License: GPL-3.0 (add the `LICENSE` file)
+Author: OmAr-Kader · License: GPL-3.0 [LICENSE](LICENSE)
+
+## 🎥 How it works
+
+<img width="1920" alt="How it works" src="https://github.com/user-attachments/assets/5b69fd80-a20a-478c-aa81-008c3c977aa8" />
+
 
 ## Install
-`brave://extensions` → enable Developer mode → Load unpacked → select this folder. Click the toolbar icon to open settings. Add `icons/` (16/32/48/128) and an `"icons"` / `"action.default_icon"` entry in `manifest.json` when ready.
+`brave://extensions` → enable Developer mode → Load unpacked → select this folder. Click the toolbar icon to open settings.
 
 ## Rules
 - Ranked by `tab.lastAccessed`; the top N stay loaded. Already-discarded tabs don't count.
