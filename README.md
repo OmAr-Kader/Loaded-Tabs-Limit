@@ -24,5 +24,11 @@ Author: OmAr-Kader · License: GPL-3.0 [LICENSE](LICENSE)
 - Tabs the browser refuses to discard are remembered per URL and not retried in a loop.
 - Settings: `chrome.storage.local`. Import/export as JSON.
 
+### For monitoring Brave Browser memory usage
+
+```bash
+ps -axo rss=,comm= | awk '/Brave Browser/ {sum += $1; count++} END {printf "Brave processes: %d\nTotal RAM: %.2f GB (%.0f MB)\n", count, sum/1024/1024, sum/1024}'
+```
+
 ## Test
 `npm test` (Node 18+, no dependencies).
