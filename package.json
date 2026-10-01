@@ -1,0 +1,9 @@
+{
+  "name": "loaded-tabs-limit",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "license": "GPL-3.0-only",
+  "author": "OmAr-Kader",
+  "scripts": { "test": "node --test test/logic.test.js" }
+}

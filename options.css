@@ -1,0 +1,111 @@
+/* SPDX-License-Identifier: GPL-3.0-only · Copyright (C) OmAr-Kader */
+
+:root {
+  color-scheme: light dark;
+  --bg: #f5f6f8;
+  --card: #ffffff;
+  --text: #1c1f24;
+  --muted: #667085;
+  --border: #d9dde3;
+  --accent: #2563eb;
+  --accent-text: #ffffff;
+  --danger: #c0392b;
+  --ok-bg: #e8f0fe;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #14161a;
+    --card: #1d2026;
+    --text: #e8eaed;
+    --muted: #9aa3b0;
+    --border: #343943;
+    --accent: #5b8def;
+    --accent-text: #0b1220;
+    --danger: #ff7b6b;
+    --ok-bg: #243049;
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+main { max-width: 720px; margin: 0 auto; padding: 24px 16px 48px; }
+
+header { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 16px; }
+h1 { font-size: 20px; margin: 0; }
+h2 { font-size: 15px; margin: 0 0 12px; }
+.sub { margin: 2px 0 0; color: var(--muted); }
+
+#status { min-height: 24px; padding: 2px 10px; border-radius: 6px; font-size: 13px; color: var(--muted); }
+#status:not(:empty) { background: var(--ok-bg); color: var(--text); }
+#status.error { color: var(--danger); }
+
+.card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 16px; margin-bottom: 16px; }
+.card-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 12px; }
+.card-head h2 { margin: 0; }
+.card-head input { max-width: 200px; }
+
+.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+@media (max-width: 520px) { .grid { grid-template-columns: 1fr; } }
+
+.field { display: flex; flex-direction: column; gap: 4px; font-weight: 500; }
+small { color: var(--muted); font-weight: 400; margin-left: 4px; }
+
+.check { display: flex; align-items: center; gap: 8px; margin: 6px 0; }
+
+input[type="text"], input[type="number"], input[type="search"] {
+  width: 100%;
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+}
+input:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+button {
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+button:hover { background: var(--ok-bg); }
+button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
+button.primary:hover { filter: brightness(1.08); }
+button.danger { color: var(--danger); }
+button.link { border: 0; padding: 0 2px; color: var(--accent); text-decoration: underline; background: none; }
+
+.add-form, .edit-form { display: grid; grid-template-columns: 1fr 1.6fr auto; gap: 8px; }
+.edit-form { grid-template-columns: 1fr 1.6fr auto auto; width: 100%; }
+@media (max-width: 560px) {
+  .add-form, .edit-form { grid-template-columns: 1fr; }
+}
+
+.error { color: var(--danger); margin: 6px 0 0; grid-column: 1 / -1; }
+
+.sites { list-style: none; margin: 12px 0 0; padding: 0; }
+.site { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid var(--border); }
+.site-info { flex: 1; min-width: 0; }
+.site-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.site-url { color: var(--muted); font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.actions { display: flex; gap: 6px; }
+
+.badge { font-size: 11.5px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--border); color: var(--muted); white-space: nowrap; }
+.badge.page { color: var(--accent); border-color: var(--accent); }
+
+.hint { color: var(--muted); font-size: 12.5px; margin: 12px 0 0; }
+code { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; background: var(--ok-bg); padding: 1px 4px; border-radius: 4px; }
+
+footer { display: flex; justify-content: space-between; align-items: center; color: var(--muted); font-size: 12.5px; }
+.footer-actions { display: flex; gap: 8px; }
