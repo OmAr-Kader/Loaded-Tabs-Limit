@@ -16,6 +16,7 @@ export const DEFAULTS = Object.freeze({
   delaySeconds: 10,
   protectPinned: true,
   showBadge: true,
+  startupActiveOnly: true,
   sites: [],
 });
 
@@ -125,6 +126,7 @@ export function sanitizeSettings(raw) {
     delaySeconds: clampInt(r.delaySeconds, LIMITS.delaySeconds.min, LIMITS.delaySeconds.max, DEFAULTS.delaySeconds),
     protectPinned: typeof r.protectPinned === 'boolean' ? r.protectPinned : DEFAULTS.protectPinned,
     showBadge: typeof r.showBadge === 'boolean' ? r.showBadge : DEFAULTS.showBadge,
+    startupActiveOnly: typeof r.startupActiveOnly === 'boolean' ? r.startupActiveOnly : DEFAULTS.startupActiveOnly,
     sites,
   };
 }

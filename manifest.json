@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Loaded Tabs Limit",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Keeps the N most recently used tabs loaded and discards the rest, with a delay and a site filter list.",
   "minimum_chrome_version": "121",
   "permissions": ["tabs", "storage", "alarms"],

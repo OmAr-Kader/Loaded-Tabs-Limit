@@ -20,6 +20,7 @@ export const isSkipped = (entry, url, now) => !!entry && entry.url === url && no
  * @param {Record<number, number>} p.pending tabId -> timestamp since which the tab has been over the limit
  * @param {Record<number, {url:string, at:number}>} p.skip  tabs the browser refused to discard
  * @param {number} p.now
+ * @param {boolean} [p.startup] true while restoring the session: limit 0, no delay
  * @returns {{loadedCount:number, nextPending:Record<number,number>, due:chrome.tabs.Tab[]}}
  *
  * Rules:
@@ -31,9 +32,12 @@ export const isSkipped = (entry, url, now) => !!entry && entry.url === url && no
  *  - a tab over the limit only becomes "due" after staying over it for delaySeconds. Any tab that
  *    stops being a candidate is dropped from `nextPending`, which is what cancels its countdown.
  */
-export function planDiscards({ tabs, settings, pending = {}, skip = {}, now = Date.now() }) {
+export function planDiscards({ tabs, settings, pending = {}, skip = {}, now = Date.now(), startup = false }) {
   const isFiltered = compileMatcher(settings.sites);
-  const delayMs = settings.delaySeconds * 1000;
+  // Startup mode (browser launch / session restore): keep nothing beyond the exempt tabs
+  // (active tab per window, audible, filtered, pinned) and discard immediately, no delay.
+  const limit = startup ? 0 : settings.limit;
+  const delayMs = startup ? 0 : settings.delaySeconds * 1000;
 
   const loaded = tabs.filter((t) => t.id != null && !t.discarded);
 
@@ -47,7 +51,7 @@ export function planDiscards({ tabs, settings, pending = {}, skip = {}, now = Da
   counted.sort((a, b) => (b.lastAccessed ?? 0) - (a.lastAccessed ?? 0));
 
   const candidates = counted
-    .slice(settings.limit)
+    .slice(limit)
     .filter((t) => !t.active && !isSkipped(skip[t.id], tabUrl(t), now));
 
   const nextPending = {};

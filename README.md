@@ -16,6 +16,7 @@ Author: OmAr-Kader · License: GPL-3.0 [LICENSE](LICENSE)
 - Ranked by `tab.lastAccessed`; the top N stay loaded. Already-discarded tabs don't count.
 - Never discarded and not counted toward N: the active tab of each window, audible tabs, filtered sites, tabs marked non-discardable in `brave://discards`, pinned tabs (toggle).
 - A tab over the limit is discarded only after it has stayed over it for the configured delay (default 10 s, 0 = immediately). Becoming active, audible, filtered or back within the top N cancels the countdown; a tab that stops being audible gets a fresh countdown.
+- On browser start (option, default on): for 30 s after launch, restored tabs are discarded immediately as they appear, so only the active tab of each window loads. Filtered, pinned (if protected) and audible tabs are still exempt. Not triggered by installing/reloading the extension.
 - Filters: `github.com` = site + all subdomains, every page. `github.com/user/repo` = that exact page only (`?query` and `#hash` are ignored). Scheme and `www.` are ignored.
 
 ## Design notes

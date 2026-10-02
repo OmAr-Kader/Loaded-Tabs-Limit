@@ -15,6 +15,8 @@ import { planDiscards, isSkipped } from './planner.js';
 
 const PENDING_KEY = 'pendingSince';
 const SKIP_KEY = 'undiscardable';
+const STARTUP_KEY = 'startupUntil';
+const STARTUP_WINDOW_MS = 30_000; // session restore keeps creating tabs for a while after onStartup
 const ALARM_NAME = 'discard-due';
 const DEBOUNCE_MS = 250;
 const TIMER_MAX_MS = 25_000; // beyond this the worker is likely suspended; rely on the alarm
@@ -87,7 +89,7 @@ async function reconcile() {
   const [settings, tabs, session] = await Promise.all([
     loadSettings(),
     chrome.tabs.query({}),
-    chrome.storage.session.get([PENDING_KEY, SKIP_KEY]),
+    chrome.storage.session.get([PENDING_KEY, SKIP_KEY, STARTUP_KEY]),
   ]);
 
   const skip = session[SKIP_KEY] ?? {};
@@ -97,6 +99,7 @@ async function reconcile() {
     pending: session[PENDING_KEY] ?? {},
     skip,
     now: Date.now(),
+    startup: settings.startupActiveOnly && Date.now() < (session[STARTUP_KEY] ?? 0),
   });
 
   const nextPending = plan.nextPending;
@@ -135,7 +138,13 @@ async function updateBadge(settings, loadedCount) {
 /* ---------- listeners (must be registered synchronously at top level) ---------- */
 
 chrome.runtime.onInstalled.addListener(() => requestReconcile(0));
-chrome.runtime.onStartup.addListener(() => requestReconcile(0));
+// Browser launch: for a short window, restored tabs are discarded as they appear so only the
+// active tab of each window stays loaded. Not done on install/update/reload of the extension.
+chrome.runtime.onStartup.addListener(async () => {
+  await chrome.storage.session.set({ [STARTUP_KEY]: Date.now() + STARTUP_WINDOW_MS });
+  requestReconcile(0);
+  setTimeout(() => requestReconcile(0), STARTUP_WINDOW_MS + 500); // final sweep, then normal rules
+});
 
 chrome.action.onClicked.addListener(() => {
   void chrome.runtime.openOptionsPage();

@@ -69,6 +69,7 @@ function fillGeneral() {
   $('delay').value = settings.delaySeconds;
   $('protectPinned').checked = settings.protectPinned;
   $('showBadge').checked = settings.showBadge;
+  $('startupActiveOnly').checked = settings.startupActiveOnly;
 }
 
 function bindGeneral() {
@@ -87,7 +88,7 @@ function bindGeneral() {
     });
   }
 
-  for (const key of ['protectPinned', 'showBadge']) {
+  for (const key of ['protectPinned', 'showBadge', 'startupActiveOnly']) {
     const box = $(key);
     box.addEventListener('change', () => {
       settings[key] = box.checked;
@@ -236,6 +237,7 @@ function bindImportExport() {
       delaySeconds: settings.delaySeconds,
       protectPinned: settings.protectPinned,
       showBadge: settings.showBadge,
+      startupActiveOnly: settings.startupActiveOnly,
       sites: settings.sites.map(({ name, url }) => ({ name, url })),
     };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
@@ -258,7 +260,7 @@ function bindImportExport() {
       // Scalar settings present in the file replace current ones; sites are merged (existing entries win).
       // Incoming ids are dropped so they can never collide with existing ones.
       const scalars = {};
-      for (const key of ['limit', 'delaySeconds', 'protectPinned', 'showBadge']) {
+      for (const key of ['limit', 'delaySeconds', 'protectPinned', 'showBadge', 'startupActiveOnly']) {
         if (key in incoming) scalars[key] = incoming[key];
       }
       const incomingSites = (Array.isArray(incoming.sites) ? incoming.sites : [])
