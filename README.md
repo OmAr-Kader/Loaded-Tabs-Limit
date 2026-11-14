@@ -13,10 +13,10 @@ Author: OmAr-Kader · License: GPL-3.0 [LICENSE](LICENSE)
 `brave://extensions` → enable Developer mode → Load unpacked → select this folder. Click the toolbar icon to open settings.
 
 ## Rules
-- Ranked by `tab.lastAccessed`; the top N stay loaded. Already-discarded tabs don't count.
-- Never discarded and not counted toward N: the active tab of each window, audible tabs, filtered sites, tabs marked non-discardable in `brave://discards`, pinned tabs (toggle).
+- The active tab of each window counts toward N and is never discarded; the remaining slots go to the most recently used tabs (ranked by `tab.lastAccessed`). Already-discarded tabs don't count.
+- Never discarded and not counted toward N: audible tabs, filtered sites, tabs marked non-discardable in `brave://discards`, pinned tabs (toggle).
 - A tab over the limit is discarded only after it has stayed over it for the configured delay (default 10 s, 0 = immediately). Becoming active, audible, filtered or back within the top N cancels the countdown; a tab that stops being audible gets a fresh countdown.
-- On browser start (option, default on): for 30 s after launch, restored tabs are discarded immediately as they appear, so only the active tab of each window loads. Filtered, pinned (if protected) and audible tabs are still exempt. Not triggered by installing/reloading the extension.
+- On browser start (option, default on): for 30 s after launch, tabs restored from the previous session (last activated before the launch) are discarded immediately as they load, so only the active tab of each window stays loaded. Tabs opened or switched to during that window follow the normal limit and delay instead. Filtered, pinned (if protected) and audible tabs are still exempt. Not triggered by installing/reloading the extension.
 - Filters: `github.com` = site + all subdomains, every page. `github.com/user/repo` = that exact page only (`?query` and `#hash` are ignored). Scheme and `www.` are ignored.
 
 ## Design notes

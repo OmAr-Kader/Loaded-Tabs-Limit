@@ -17,6 +17,10 @@ const PENDING_KEY = 'pendingSince';
 const SKIP_KEY = 'undiscardable';
 const STARTUP_KEY = 'startupUntil';
 const STARTUP_WINDOW_MS = 30_000; // session restore keeps creating tabs for a while after onStartup
+// Tabs activated within this grace before onStartup - the session restore bringing the active tabs
+// back - still count as "this session", so a tab the user switches away from right after launch is
+// governed by the normal rules instead of being insta-discarded by the startup sweep.
+const STARTUP_ACTIVATE_GRACE_MS = 5_000;
 const ALARM_NAME = 'discard-due';
 const DEBOUNCE_MS = 250;
 const TIMER_MAX_MS = 25_000; // beyond this the worker is likely suspended; rely on the alarm
@@ -93,13 +97,25 @@ async function reconcile() {
   ]);
 
   const skip = session[SKIP_KEY] ?? {};
+  const now = Date.now();
+  // Startup mode covers the session-restore burst after browser launch, and applies only to tabs
+  // last activated before this launch (restored from the previous session, not touched since -
+  // lastAccessed is refreshed on every activation): they are discarded as they load. Tabs the user
+  // opens or switches to during the window have a fresh lastAccessed and follow the normal limit
+  // and delay, so startup never forces "only one loaded tab" onto live user activity.
+  const startupUntil = session[STARTUP_KEY] ?? 0;
+  const startupSince =
+    settings.startupActiveOnly && now < startupUntil
+      ? startupUntil - STARTUP_WINDOW_MS - STARTUP_ACTIVATE_GRACE_MS // = onStartup - grace
+      : null;
+
   const plan = planDiscards({
     tabs,
     settings,
     pending: session[PENDING_KEY] ?? {},
     skip,
-    now: Date.now(),
-    startup: settings.startupActiveOnly && Date.now() < (session[STARTUP_KEY] ?? 0),
+    now,
+    startupSince,
   });
 
   const nextPending = plan.nextPending;
@@ -113,7 +129,6 @@ async function reconcile() {
 
   // Forget refusals once the tab is gone, navigated elsewhere, or the retry window has passed.
   const urls = new Map(tabs.map((t) => [t.id, t.url || t.pendingUrl || '']));
-  const now = Date.now();
   for (const id of Object.keys(skip)) {
     if (!isSkipped(skip[id], urls.get(Number(id)), now)) delete skip[id];
   }
@@ -138,8 +153,10 @@ async function updateBadge(settings, loadedCount) {
 /* ---------- listeners (must be registered synchronously at top level) ---------- */
 
 chrome.runtime.onInstalled.addListener(() => requestReconcile(0));
-// Browser launch: for a short window, restored tabs are discarded as they appear so only the
-// active tab of each window stays loaded. Not done on install/update/reload of the extension.
+// Browser launch: for a short window, tabs restored from the previous session (last activated
+// before the launch) are discarded as they load, so only the active tab of each window stays
+// loaded. The sweep never touches tabs opened or switched to during the window - those follow the
+// normal rules. Not done on install/update/reload of the extension.
 chrome.runtime.onStartup.addListener(async () => {
   await chrome.storage.session.set({ [STARTUP_KEY]: Date.now() + STARTUP_WINDOW_MS });
   requestReconcile(0);
