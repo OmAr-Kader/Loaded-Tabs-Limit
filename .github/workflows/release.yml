@@ -1,0 +1,116 @@
+# .github/workflows/release.yml
+name: Release
+
+on:
+  push:
+    branches: ['**']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    if: github.ref_name == github.event.repository.default_branch
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Read manifest version
+        id: version
+        run: |
+          VERSION=$(jq -r '.version // empty' manifest.json)
+          if [ -z "$VERSION" ]; then
+            echo "version not found in manifest.json" >&2
+            exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Sync README version
+        run: |
+          V="${{ steps.version.outputs.version }}"
+          case "$V" in
+            *alpha*|*beta*)
+              echo "Pre-release $V, skipping README update"
+              exit 0
+              ;;
+          esac
+          if ! grep -qE '^[[:space:]]*composeSturdy[[:space:]]*=' README.md; then
+            echo "composeSturdy not found in README.md, skipping"
+            exit 0
+          fi
+          if grep -qE "^[[:space:]]*composeSturdy[[:space:]]*=[[:space:]]*\"$V\"" README.md; then
+            echo "README already at $V"
+            exit 0
+          fi
+          sed -i -E "s/^([[:space:]]*composeSturdy[[:space:]]*=[[:space:]]*\")[^\"]*(\")/\1$V\2/" README.md
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add README.md
+          git commit -m "Update README to $V"
+          git push
+
+      - name: Check if tag exists
+        id: tag
+        run: |
+          if git ls-remote --exit-code --tags origin "refs/tags/${{ steps.version.outputs.version }}" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+          
+      - name: Delete alpha/beta pre-releases of this version
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          V="${{ steps.version.outputs.version }}"
+          echo "Version: $V"
+          case "$V" in
+            *alpha*|*beta*)
+              echo "Pre-release $V, skipping cleanup"
+              exit 0
+              ;;
+          esac
+
+          echo "Looking for pre-releases matching $V-alpha* / $V-beta*"
+
+          # Releases (and their tags)
+          RELEASES=0
+          while read -r T; do
+            case "$T" in
+              "$V"-alpha*|"$V"-beta*)
+                echo "Deleting release + tag: $T"
+                gh release delete "$T" --yes --cleanup-tag
+                RELEASES=$((RELEASES + 1))
+                ;;
+            esac
+          done < <(gh release list --limit 1000 --json tagName --jq '.[].tagName')
+          echo "Releases deleted: $RELEASES"
+
+          # Leftover tags without a release
+          TAGS=0
+          while read -r REF; do
+            echo "Deleting leftover tag: $REF"
+            git push origin --delete "$REF"
+            TAGS=$((TAGS + 1))
+          done < <(git ls-remote --tags origin "refs/tags/$V-alpha*" "refs/tags/$V-beta*" | awk '{print $2}' | grep -v '\^{}$' || true)
+          echo "Leftover tags deleted: $TAGS"
+
+          if [ "$RELEASES" -eq 0 ] && [ "$TAGS" -eq 0 ]; then
+            echo "No alpha/beta pre-releases found for $V, nothing to clean"
+          fi
+
+      - name: Create tag and release
+        if: steps.tag.outputs.exists == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          V="${{ steps.version.outputs.version }}"
+          FLAGS=""
+          case "$V" in *alpha*|*beta*) FLAGS="--prerelease" ;; esac
+          git log -1 --pretty=%B "$GITHUB_SHA" > notes.md
+          gh release create "$V" \
+            --target "$(git rev-parse HEAD)" \
+            --title "$V" \
+            --notes-file notes.md \
+            $FLAGS
