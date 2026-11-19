@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) OmAr-Kader
 
-import { loadSettings, saveSettings, sanitizeSettings, parseSiteUrl, clampInt, LIMITS } from './shared.js';
+import { loadSettings, saveSettings, sanitizeSettings, parseSiteUrl, clampInt, LIMITS, loadLastCacheClear, runCacheClear, shouldClearCache, nextCachePeriodStart } from './shared.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -228,6 +228,59 @@ function bindAddForm() {
   $('search').addEventListener('input', renderSites);
 }
 
+/* ---------- cache clearing ---------- */
+
+function formatDateTime(ms) {
+  return ms ? new Date(ms).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) : 'Never';
+}
+
+async function renderCacheStatus() {
+  const last = await loadLastCacheClear();
+  $('last-cleared').textContent = formatDateTime(last);
+  if (!settings.autoClearCache) {
+    $('next-clear').textContent = 'Disabled';
+    return;
+  }
+  // Already outside the current period: the very next browser start clears.
+  const due = shouldClearCache(last, settings.clearCachePeriod);
+  const next = due ? null : nextCachePeriodStart(last, settings.clearCachePeriod);
+  $('next-clear').textContent = next ? formatDateTime(next) : 'On next browser start';
+}
+
+async function fillCache() {
+  $('autoClearCache').checked = settings.autoClearCache;
+  $('clearCachePeriod').value = settings.clearCachePeriod;
+  $('clearCachePeriod').disabled = !settings.autoClearCache;
+  await renderCacheStatus();
+}
+
+function bindCacheClear() {
+  $('autoClearCache').addEventListener('change', () => {
+    settings.autoClearCache = $('autoClearCache').checked;
+    $('clearCachePeriod').disabled = !settings.autoClearCache;
+    void renderCacheStatus();
+    persist();
+  });
+  $('clearCachePeriod').addEventListener('change', () => {
+    settings.clearCachePeriod = $('clearCachePeriod').value;
+    void renderCacheStatus();
+    persist();
+  });
+  $('clear-cache').addEventListener('click', async () => {
+    const button = $('clear-cache');
+    button.disabled = true;
+    try {
+      await runCacheClear();
+      await renderCacheStatus();
+      flash('Cache cleared.');
+    } catch (err) {
+      flash(`Could not clear cache: ${err.message}`, { error: true });
+    } finally {
+      button.disabled = false;
+    }
+  });
+}
+
 /* ---------- import / export ---------- */
 
 function bindImportExport() {
@@ -238,6 +291,8 @@ function bindImportExport() {
       protectPinned: settings.protectPinned,
       showBadge: settings.showBadge,
       startupActiveOnly: settings.startupActiveOnly,
+      autoClearCache: settings.autoClearCache,
+      clearCachePeriod: settings.clearCachePeriod,
       sites: settings.sites.map(({ name, url }) => ({ name, url })),
     };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
@@ -260,7 +315,7 @@ function bindImportExport() {
       // Scalar settings present in the file replace current ones; sites are merged (existing entries win).
       // Incoming ids are dropped so they can never collide with existing ones.
       const scalars = {};
-      for (const key of ['limit', 'delaySeconds', 'protectPinned', 'showBadge', 'startupActiveOnly']) {
+      for (const key of ['limit', 'delaySeconds', 'protectPinned', 'showBadge', 'startupActiveOnly', 'autoClearCache', 'clearCachePeriod']) {
         if (key in incoming) scalars[key] = incoming[key];
       }
       const incomingSites = (Array.isArray(incoming.sites) ? incoming.sites : [])
@@ -287,4 +342,6 @@ fillGeneral();
 bindGeneral();
 bindAddForm();
 bindImportExport();
+bindCacheClear();
 renderSites();
+await fillCache();

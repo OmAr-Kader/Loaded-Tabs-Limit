@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) OmAr-Kader
 //
-// Settings schema, sanitizing, URL normalization and filter matching.
+// Settings schema, sanitizing, URL normalization, filter matching and cache-clear scheduling.
 // Shared by the service worker and the options page. No DOM / no top-level chrome.* access.
 
 export const STORAGE_KEY = 'settings';
@@ -11,12 +11,17 @@ export const LIMITS = Object.freeze({
   delaySeconds: Object.freeze({ min: 0, max: 3600 }),
 });
 
+export const CACHE_CLEAR_KEY = 'lastCacheClearAt';
+export const CACHE_PERIODS = Object.freeze(['daily', 'weekly', 'monthly']);
+
 export const DEFAULTS = Object.freeze({
   limit: 4,
   delaySeconds: 10,
   protectPinned: true,
   showBadge: true,
   startupActiveOnly: true,
+  autoClearCache: false,
+  clearCachePeriod: 'weekly',
   sites: [],
 });
 
@@ -127,6 +132,8 @@ export function sanitizeSettings(raw) {
     protectPinned: typeof r.protectPinned === 'boolean' ? r.protectPinned : DEFAULTS.protectPinned,
     showBadge: typeof r.showBadge === 'boolean' ? r.showBadge : DEFAULTS.showBadge,
     startupActiveOnly: typeof r.startupActiveOnly === 'boolean' ? r.startupActiveOnly : DEFAULTS.startupActiveOnly,
+    autoClearCache: typeof r.autoClearCache === 'boolean' ? r.autoClearCache : DEFAULTS.autoClearCache,
+    clearCachePeriod: CACHE_PERIODS.includes(r.clearCachePeriod) ? r.clearCachePeriod : DEFAULTS.clearCachePeriod,
     sites,
   };
 }
@@ -140,4 +147,66 @@ export async function saveSettings(settings) {
   const clean = sanitizeSettings(settings);
   await chrome.storage.local.set({ [STORAGE_KEY]: clean });
   return clean;
+}
+
+/* ---------- cache clearing ---------- */
+
+// Calendar buckets, not elapsed time: "daily" means once per calendar day, so a clear at 23:50
+// also covers the next morning's start. Weekly buckets start on Monday; a bucket is identified by
+// the date of its Monday, which also works across year boundaries.
+export function cachePeriodKey(ms, period) {
+  const d = new Date(ms);
+  switch (period) {
+    case 'daily':
+      return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+    case 'weekly': {
+      d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); // shift back to Monday
+      return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+    }
+    case 'monthly':
+      return `${d.getFullYear()}-${d.getMonth()}`;
+    default:
+      return null; // unknown period never clears
+  }
+}
+
+/** @returns {boolean} whether the browser cache should be cleared now */
+export function shouldClearCache(lastClearAt, period, now = Date.now()) {
+  if (!lastClearAt) return true; // never cleared before
+  return cachePeriodKey(lastClearAt, period) !== cachePeriodKey(now, period);
+}
+
+/**
+ * Start of the period following the one the last clear falls in, i.e. the earliest moment a
+ * browser start would clear again.
+ * @returns {number|null} null when there is no last clear or the period is unknown.
+ */
+export function nextCachePeriodStart(lastClearAt, period) {
+  if (!lastClearAt) return null;
+  const d = new Date(lastClearAt);
+  switch (period) {
+    case 'daily':
+      return new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1).getTime();
+    case 'weekly': {
+      const daysToMonday = (8 - d.getDay()) % 7 || 7; // Sunday = 0, Monday = 1
+      return new Date(d.getFullYear(), d.getMonth(), d.getDate() + daysToMonday).getTime();
+    }
+    case 'monthly':
+      return new Date(d.getFullYear(), d.getMonth() + 1, 1).getTime();
+    default:
+      return null;
+  }
+}
+
+export async function loadLastCacheClear() {
+  const stored = await chrome.storage.local.get(CACHE_CLEAR_KEY);
+  return stored[CACHE_CLEAR_KEY] ?? 0;
+}
+
+/** Removes cached files (nothing else) and records the time, resetting the auto-clear period. */
+export async function runCacheClear() {
+  await chrome.browsingData.removeCache({});
+  const at = Date.now();
+  await chrome.storage.local.set({ [CACHE_CLEAR_KEY]: at });
+  return at;
 }

@@ -10,7 +10,7 @@
 // a ~30 s minimum for alarms). Cancellation is implicit: a tab that becomes active, audible,
 // filtered, ranks within N, or is closed is no longer a candidate and its entry is dropped.
 
-import { loadSettings, STORAGE_KEY } from './shared.js';
+import { loadSettings, STORAGE_KEY, CACHE_CLEAR_KEY, shouldClearCache, runCacheClear } from './shared.js';
 import { planDiscards, isSkipped } from './planner.js';
 
 const PENDING_KEY = 'pendingSince';
@@ -150,6 +150,24 @@ async function updateBadge(settings, loadedCount) {
   await chrome.action.setBadgeBackgroundColor({ color: '#2563eb' });
 }
 
+/* ---------- auto cache clear ---------- */
+
+// Checked once per browser launch: when enabled and the last clear (manual or automatic) falls
+// outside the current daily/weekly/monthly calendar bucket, the cache is cleared and the
+// timestamp recorded, which starts the next period. Never runs on install/update/reload.
+async function autoClearCache() {
+  try {
+    const settings = await loadSettings();
+    if (!settings.autoClearCache) return;
+    const stored = await chrome.storage.local.get(CACHE_CLEAR_KEY);
+    if (!shouldClearCache(stored[CACHE_CLEAR_KEY], settings.clearCachePeriod)) return;
+    await runCacheClear();
+    console.info('[Loaded Tabs Limit] cache cleared');
+  } catch (err) {
+    console.error('[Loaded Tabs Limit] auto cache clear failed', err);
+  }
+}
+
 /* ---------- listeners (must be registered synchronously at top level) ---------- */
 
 chrome.runtime.onInstalled.addListener(() => requestReconcile(0));
@@ -161,6 +179,7 @@ chrome.runtime.onStartup.addListener(async () => {
   await chrome.storage.session.set({ [STARTUP_KEY]: Date.now() + STARTUP_WINDOW_MS });
   requestReconcile(0);
   setTimeout(() => requestReconcile(0), STARTUP_WINDOW_MS + 500); // final sweep, then normal rules
+  void autoClearCache();
 });
 
 chrome.action.onClicked.addListener(() => {

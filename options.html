@@ -63,6 +63,34 @@
       </p>
     </section>
 
+    <section class="card" aria-labelledby="h-cache">
+      <h2 id="h-cache">Cache clearing</h2>
+      <label class="check"><input id="autoClearCache" type="checkbox"> Clear the browser cache automatically <small>checked on browser start</small></label>
+      <div class="grid grid-3">
+        <label class="field" for="clearCachePeriod">
+          <span>Clear every</span>
+          <select id="clearCachePeriod">
+            <option value="daily">Day</option>
+            <option value="weekly">Week</option>
+            <option value="monthly">Month</option>
+          </select>
+        </label>
+        <div class="field">
+          <span>Last cleared</span>
+          <div id="last-cleared" class="static-field">Never</div>
+        </div>
+        <div class="field">
+          <span>Next clear</span>
+          <div id="next-clear" class="static-field">On next browser start</div>
+        </div>
+      </div>
+      <button id="clear-cache" type="button" class="primary">Clear cache now</button>
+      <p class="hint">
+        “Day”, “Week” and “Month” clear on the first browser start of each new day, week (starting Monday) and month.
+        A manual clear also restarts the period. Only cached files are removed — cookies, history, passwords and site data are untouched.
+      </p>
+    </section>
+
     <footer>
       <div class="footer-actions">
         <button id="export" type="button">Export</button>

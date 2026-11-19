@@ -53,6 +53,8 @@ h2 { font-size: 15px; margin: 0 0 12px; }
 .card-head input { max-width: 200px; }
 
 .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+.grid-3 { grid-template-columns: repeat(3, 1fr); }
+@media (max-width: 640px) { .grid-3 { grid-template-columns: 1fr; } }
 @media (max-width: 520px) { .grid { grid-template-columns: 1fr; } }
 
 .field { display: flex; flex-direction: column; gap: 4px; font-weight: 500; }
@@ -60,7 +62,7 @@ small { color: var(--muted); font-weight: 400; margin-left: 4px; }
 
 .check { display: flex; align-items: center; gap: 8px; margin: 6px 0; }
 
-input[type="text"], input[type="number"], input[type="search"] {
+input[type="text"], input[type="number"], input[type="search"], select {
   width: 100%;
   padding: 7px 10px;
   border: 1px solid var(--border);
@@ -68,6 +70,18 @@ input[type="text"], input[type="number"], input[type="search"] {
   background: transparent;
   color: inherit;
   font: inherit;
+}
+select:disabled { opacity: 0.55; }
+.static-field {
+  width: 100%;
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--muted);
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 input:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 
