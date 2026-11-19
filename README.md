@@ -1,4 +1,4 @@
-# Loaded Tabs Limit
+# Sturdy Clean Browser
 
 Brave/Chromium (MV3, Chrome 121+) extension. Keeps the N most recently used tabs loaded (across all windows) and discards the rest with `chrome.tabs.discard`.
 

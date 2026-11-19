@@ -53,7 +53,7 @@ async function run() {
       await reconcile();
     } while (rerun);
   } catch (err) {
-    console.error('[Loaded Tabs Limit] reconcile failed', err);
+    console.error('[Sturdy Clean Browser] reconcile failed', err);
   } finally {
     running = false;
   }
@@ -162,9 +162,9 @@ async function autoClearCache() {
     const stored = await chrome.storage.local.get(CACHE_CLEAR_KEY);
     if (!shouldClearCache(stored[CACHE_CLEAR_KEY], settings.clearCachePeriod)) return;
     await runCacheClear();
-    console.info('[Loaded Tabs Limit] cache cleared');
+    console.info('[Sturdy Clean Browser] cache cleared');
   } catch (err) {
-    console.error('[Loaded Tabs Limit] auto cache clear failed', err);
+    console.error('[Sturdy Clean Browser] auto cache clear failed', err);
   }
 }
 

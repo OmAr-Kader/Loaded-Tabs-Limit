@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Loaded Tabs Limit",
+  "name": "Sturdy Clean Browser",
   "version": "1.1.0",
-  "description": "Keeps the N most recently used tabs loaded and discards the rest, with a delay and a site filter list.",
+  "description": "Keeps the N most recently used tabs loaded and discards the rest, with a delay and a site filter list and automatic cache clearing.",
   "minimum_chrome_version": "121",
   "permissions": ["tabs", "storage", "alarms", "browsingData"],
   "background": {
@@ -15,7 +15,7 @@
       "128": "icon.png"
   },
   "action": {
-    "default_title": "Loaded Tabs Limit – Settings"
+    "default_title": "Sturdy Clean Browser – Settings"
   },
   "options_ui": {
     "page": "options.html",
