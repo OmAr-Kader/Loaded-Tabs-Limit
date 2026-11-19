@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) OmAr-Kader
 
-import { loadSettings, saveSettings, sanitizeSettings, parseSiteUrl, clampInt, LIMITS, loadLastCacheClear, runCacheClear, shouldClearCache, nextCachePeriodStart } from './shared.js';
+import { loadSettings, saveSettings, sanitizeSettings, parseSiteUrl, clampInt, LIMITS, loadLastCacheClear, runCacheClear, shouldClearCache, nextCachePeriodStart, isCacheClearing, CACHE_CLEAR_KEY, CACHE_CLEARING_KEY } from './shared.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -235,8 +235,16 @@ function formatDateTime(ms) {
 }
 
 async function renderCacheStatus() {
+  const clearing = await isCacheClearing();
   const last = await loadLastCacheClear();
+  const button = $('clear-cache');
+  button.disabled = clearing;
+  button.textContent = clearing ? 'Cleaning…' : 'Clear cache now';
   $('last-cleared').textContent = formatDateTime(last);
+  if (clearing) {
+    $('next-clear').textContent = 'Cleaning…';
+    return;
+  }
   if (!settings.autoClearCache) {
     $('next-clear').textContent = 'Disabled';
     return;
@@ -245,6 +253,16 @@ async function renderCacheStatus() {
   const due = shouldClearCache(last, settings.clearCachePeriod);
   const next = due ? null : nextCachePeriodStart(last, settings.clearCachePeriod);
   $('next-clear').textContent = next ? formatDateTime(next) : 'On next browser start';
+}
+
+// The service worker clears the cache on browser start, possibly while this page is open:
+// watch storage so "Last cleared" / "Next clear" update without a manual refresh, and a
+// running clear shows "Cleaning…" as soon as the marker appears.
+function watchCacheState() {
+  chrome.storage.onChanged.addListener((changes, area) => {
+    const key = area === 'session' ? CACHE_CLEARING_KEY : CACHE_CLEAR_KEY;
+    if (changes[key]) void renderCacheStatus();
+  });
 }
 
 async function fillCache() {
@@ -268,15 +286,16 @@ function bindCacheClear() {
   });
   $('clear-cache').addEventListener('click', async () => {
     const button = $('clear-cache');
+    if (button.disabled) return;
     button.disabled = true;
+    button.textContent = 'Cleaning…';
     try {
       await runCacheClear();
-      await renderCacheStatus();
       flash('Cache cleared.');
     } catch (err) {
       flash(`Could not clear cache: ${err.message}`, { error: true });
     } finally {
-      button.disabled = false;
+      await renderCacheStatus(); // restores label/state and refreshes both timestamps
     }
   });
 }
@@ -299,6 +318,7 @@ function bindImportExport() {
     const link = el('a', { href: URL.createObjectURL(blob), download: 'loaded-tabs-limit.json' });
     link.click();
     setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+    flash('Settings exported.');
   });
 
   const fileInput = $('import-file');
@@ -328,6 +348,7 @@ function bindImportExport() {
       fillGeneral();
       editingId = null;
       renderSites();
+      await fillCache(); // refresh the cache checkbox/period and the status row too
       persist(`Imported ${added} new site${added === 1 ? '' : 's'}.`);
     } catch (err) {
       flash(`Import failed: ${err.message}`, { error: true });
@@ -343,5 +364,6 @@ bindGeneral();
 bindAddForm();
 bindImportExport();
 bindCacheClear();
+watchCacheState();
 renderSites();
 await fillCache();

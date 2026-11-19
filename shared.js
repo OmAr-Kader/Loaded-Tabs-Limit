@@ -12,6 +12,8 @@ export const LIMITS = Object.freeze({
 });
 
 export const CACHE_CLEAR_KEY = 'lastCacheClearAt';
+// Session-scoped marker: set while a clear is running so open settings pages can show progress.
+export const CACHE_CLEARING_KEY = 'cacheClearingSince';
 export const CACHE_PERIODS = Object.freeze(['daily', 'weekly', 'monthly']);
 
 export const DEFAULTS = Object.freeze({
@@ -203,10 +205,28 @@ export async function loadLastCacheClear() {
   return stored[CACHE_CLEAR_KEY] ?? 0;
 }
 
+/** @returns {boolean} whether a cache clear is currently running (manual or automatic). */
+export async function isCacheClearing() {
+  if (!chrome.storage.session) return false;
+  try {
+    const stored = await chrome.storage.session.get(CACHE_CLEARING_KEY);
+    return Boolean(stored[CACHE_CLEARING_KEY]);
+  } catch {
+    return false;
+  }
+}
+
 /** Removes cached files (nothing else) and records the time, resetting the auto-clear period. */
 export async function runCacheClear() {
-  await chrome.browsingData.removeCache({});
-  const at = Date.now();
-  await chrome.storage.local.set({ [CACHE_CLEAR_KEY]: at });
-  return at;
+  const session = chrome.storage.session;
+  if (session) await session.set({ [CACHE_CLEARING_KEY]: Date.now() }).catch(() => {});
+  try {
+    await chrome.browsingData.removeCache({});
+    const at = Date.now();
+    await chrome.storage.local.set({ [CACHE_CLEAR_KEY]: at });
+    return at;
+  } finally {
+    // Always release the marker so no settings page is left showing "Cleaning…".
+    if (session) await session.remove(CACHE_CLEARING_KEY).catch(() => {});
+  }
 }
