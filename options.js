@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) OmAr-Kader
 
-import { loadSettings, saveSettings, sanitizeSettings, parseSiteUrl, clampInt, LIMITS, loadLastCacheClear, runCacheClear, shouldClearCache, nextCachePeriodStart, isCacheClearing, CACHE_CLEAR_KEY, CACHE_CLEARING_KEY } from './shared.js';
+import { loadSettings, saveSettings, sanitizeSettings, parseSiteUrl, clampInt, LIMITS, loadLastCacheClear, runCacheClear, shouldClearCache, nextCachePeriodStart, isCacheClearing, CACHE_CLEAR_KEY, CACHE_CLEARING_KEY, TEST_CACHE_CLEAR_KEY } from './shared.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -249,13 +249,13 @@ async function renderCacheStatus() {
     $('next-clear').textContent = 'Disabled';
     return;
   }
-  // Already outside the current period: the very next browser start clears.
+  // The background alarm clears as soon as a period is due; otherwise show its next wake time.
   const due = shouldClearCache(last, settings.clearCachePeriod);
   const next = due ? null : nextCachePeriodStart(last, settings.clearCachePeriod);
-  $('next-clear').textContent = next ? formatDateTime(next) : 'On next browser start';
+  $('next-clear').textContent = next ? formatDateTime(next) : 'Due now';
 }
 
-// The service worker clears the cache on browser start, possibly while this page is open:
+// The service worker clears the cache on schedule, possibly while this page is open:
 // watch storage so "Last cleared" / "Next clear" update without a manual refresh, and a
 // running clear shows "Cleaning…" as soon as the marker appears.
 function watchCacheState() {
@@ -298,6 +298,112 @@ function bindCacheClear() {
       await renderCacheStatus(); // restores label/state and refreshes both timestamps
     }
   });
+}
+
+/* ---------- TESTING ONLY: cache clear test (remove with the matching HTML card) ---------- */
+
+const TEST_CLEAR_UNITS = Object.freeze({ seconds: 1_000, minutes: 60_000, hours: 3_600_000 });
+const TEST_CLEAR_MAX_MS = 24 * 3_600_000; // up to 24 hours
+let testClearTicker = null;
+
+function formatDuration(ms) {
+  const totalSeconds = Math.ceil(ms / 1000);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  if (hours) return `${hours}h ${minutes}m ${seconds}s`;
+  if (minutes) return `${minutes}m ${seconds}s`;
+  return `${seconds}s`;
+}
+
+function stopTestClearTicker() {
+  if (testClearTicker !== null) {
+    clearInterval(testClearTicker);
+    testClearTicker = null;
+  }
+}
+
+async function renderCacheClearTest() {
+  const status = $('test-clear-status');
+  if (!status) return;
+  const stored = await chrome.storage.local.get(TEST_CACHE_CLEAR_KEY);
+  const when = Number(stored[TEST_CACHE_CLEAR_KEY]) || 0;
+  const cancel = $('test-clear-cancel');
+  if (!when) {
+    stopTestClearTicker();
+    status.textContent = 'No test scheduled';
+    cancel.disabled = true;
+    return;
+  }
+  cancel.disabled = false;
+  const left = Math.max(0, when - Date.now());
+  const at = new Date(when).toLocaleTimeString(undefined, { timeStyle: 'medium' });
+  status.textContent = `Runs at ${at} (in ${formatDuration(left)})`;
+  if (testClearTicker === null) {
+    testClearTicker = setInterval(() => void renderCacheClearTest(), 1000);
+  }
+}
+
+/**
+ * TEST ONLY: injects `delayMs` as the next cache-clear period time. This is the only thing the
+ * test changes: the production scheduler reads it as the next period start, schedules its real
+ * `cache-clear-due` alarm, and runs the normal clear/reschedule path when it fires.
+ */
+async function scheduleCacheClearTest(delayMs) {
+  const delay = Math.round(Number(delayMs));
+  if (!Number.isFinite(delay) || delay < 1000) throw new Error('Enter at least 1 second.');
+  if (delay > TEST_CLEAR_MAX_MS) throw new Error('The test delay is limited to 24 hours.');
+  if (!settings?.autoClearCache) throw new Error('Enable automatic cache clearing first.');
+  // Persisted in storage.local like the production last-clear time, so closing and reopening the
+  // browser keeps the injected period time (and the real alarm) in place.
+  await chrome.storage.local.set({ [TEST_CACHE_CLEAR_KEY]: Date.now() + delay });
+  await renderCacheClearTest();
+  return delay;
+}
+
+async function cancelCacheClearTest() {
+  await chrome.storage.local.remove(TEST_CACHE_CLEAR_KEY);
+  await renderCacheClearTest();
+}
+
+function updateTestClearMax() {
+  const input = $('test-clear-delay');
+  if (!input) return;
+  const unit = $('test-clear-unit').value;
+  const max = Math.max(1, Math.floor(TEST_CLEAR_MAX_MS / (TEST_CLEAR_UNITS[unit] ?? 1000)));
+  input.max = max;
+  if (Number(input.value) > max) input.value = max;
+}
+
+// TEST ONLY: also callable from the settings-page console, e.g. await scheduleCacheClearTest(5000).
+window.scheduleCacheClearTest = scheduleCacheClearTest;
+window.cancelCacheClearTest = cancelCacheClearTest;
+
+function bindCacheClearTest() {
+  const form = $('test-clear-form');
+  if (!form) return;
+  $('test-clear-unit').addEventListener('change', updateTestClearMax);
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const input = $('test-clear-delay');
+    const value = clampInt(input.value, 1, Number(input.max) || 1, 10);
+    input.value = value;
+    const unit = $('test-clear-unit').value;
+    const delayMs = value * (TEST_CLEAR_UNITS[unit] ?? 1000);
+    try {
+      showError($('test-clear-error'), '');
+      const scheduled = await scheduleCacheClearTest(delayMs);
+      flash(`Test clear scheduled in ${formatDuration(scheduled)}.`);
+    } catch (err) {
+      showError($('test-clear-error'), err.message);
+    }
+  });
+  $('test-clear-cancel').addEventListener('click', async () => {
+    await cancelCacheClearTest();
+    showError($('test-clear-error'), '');
+    flash('Test clear cancelled.');
+  });
+  updateTestClearMax();
 }
 
 /* ---------- import / export ---------- */
@@ -364,6 +470,8 @@ bindGeneral();
 bindAddForm();
 bindImportExport();
 bindCacheClear();
+bindCacheClearTest();
 watchCacheState();
 renderSites();
 await fillCache();
+await renderCacheClearTest();

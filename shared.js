@@ -14,7 +14,24 @@ export const LIMITS = Object.freeze({
 export const CACHE_CLEAR_KEY = 'lastCacheClearAt';
 // Session-scoped marker: set while a clear is running so open settings pages can show progress.
 export const CACHE_CLEARING_KEY = 'cacheClearingSince';
+// TEST ONLY: armed by the settings page cache-clear test card. Stored in storage.local (like
+// CACHE_CLEAR_KEY) so it survives a browser restart; the service worker schedules its real cache
+// alarm at this time, then runs the normal clear/reschedule path.
+export const TEST_CACHE_CLEAR_KEY = 'testCacheClearWhen';
 export const CACHE_PERIODS = Object.freeze(['daily', 'weekly', 'monthly']);
+
+// Toolbar (action) titles. While a cache clear runs, the background attaches the action popup and
+// switches to the cleaning title; the popup itself restores the default when it is dismissed.
+export const ACTION_TITLE = 'Sturdy: Browser Cleaner – Settings';
+export const ACTION_TITLE_CLEANING = 'Sturdy: Browser Cleaner – Cleaning cache…';
+
+// Cleaning-popup phase state (chrome.storage.session): while `popupPhaseUntil` is in the future
+// the popup stays attached to the toolbar icon and auto-open attempts continue; `popupOpened`
+// records that openPopup() succeeded so a popup the user dismissed is not re-opened. The
+// `popup-phase-end` alarm ends the phase (service-worker timers would die with the worker).
+export const POPUP_PHASE_KEY = 'popupPhaseUntil';
+export const POPUP_OPENED_KEY = 'popupOpened';
+export const POPUP_ALARM_NAME = 'popup-phase-end';
 
 export const DEFAULTS = Object.freeze({
   limit: 4,
@@ -179,8 +196,8 @@ export function shouldClearCache(lastClearAt, period, now = Date.now()) {
 }
 
 /**
- * Start of the period following the one the last clear falls in, i.e. the earliest moment a
- * browser start would clear again.
+ * Start of the period following the one the last clear falls in, i.e. the earliest moment the
+ * next automatic clear is due.
  * @returns {number|null} null when there is no last clear or the period is unknown.
  */
 export function nextCachePeriodStart(lastClearAt, period) {
@@ -205,12 +222,42 @@ export async function loadLastCacheClear() {
   return stored[CACHE_CLEAR_KEY] ?? 0;
 }
 
+/**
+ * Decides what the automatic cache-clear alarm should do at `now`.
+ * - 'disabled': automatic clearing is off → no alarm.
+ * - 'clear':    a clear is due (never cleared before, or the period rolled over) → clear now.
+ * - 'schedule': the current period is covered → wake at `at`, the start of the next period.
+ * - 'none':     the period is unknown → no alarm.
+ *
+ * `dueAt` (TEST ONLY) replaces the computed period start: before it the plan schedules at
+ * `dueAt`, at/after it the plan clears. The settings page test card injects its chosen time here;
+ * everything after the decision is the normal production clear/reschedule path.
+ * @returns {{action:'disabled'|'clear'|'none'}|{action:'schedule', at:number}}
+ */
+export function planCacheClear({ autoClearCache, lastClearAt, period, now = Date.now(), dueAt = null }) {
+  if (!autoClearCache) return { action: 'disabled' };
+  if (dueAt != null) {
+    return now >= dueAt ? { action: 'clear' } : { action: 'schedule', at: dueAt };
+  }
+  if (shouldClearCache(lastClearAt, period, now)) return { action: 'clear' };
+  const at = nextCachePeriodStart(lastClearAt, period);
+  return at == null ? { action: 'none' } : { action: 'schedule', at };
+}
+
+// A clear takes seconds; a much older marker is left over from a context that was killed
+// mid-clear and must not block every future automatic clear.
+const CACHE_CLEARING_STALE_MS = 5 * 60_000;
+
 /** @returns {boolean} whether a cache clear is currently running (manual or automatic). */
 export async function isCacheClearing() {
   if (!chrome.storage.session) return false;
   try {
     const stored = await chrome.storage.session.get(CACHE_CLEARING_KEY);
-    return Boolean(stored[CACHE_CLEARING_KEY]);
+    const since = stored[CACHE_CLEARING_KEY];
+    if (!since) return false;
+    if (Date.now() - since < CACHE_CLEARING_STALE_MS) return true;
+    await chrome.storage.session.remove(CACHE_CLEARING_KEY).catch(() => {});
+    return false;
   } catch {
     return false;
   }

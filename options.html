@@ -65,7 +65,7 @@
 
     <section class="card" aria-labelledby="h-cache">
       <h2 id="h-cache">Cache clearing</h2>
-      <label class="check"><input id="autoClearCache" type="checkbox"> Clear the browser cache automatically <small>checked on browser start</small></label>
+      <label class="check"><input id="autoClearCache" type="checkbox"> Clear the browser cache automatically <small>runs on a schedule</small></label>
       <div class="grid grid-3">
         <label class="field" for="clearCachePeriod">
           <span>Clear every</span>
@@ -81,15 +81,56 @@
         </div>
         <div class="field">
           <span>Next clear</span>
-          <div id="next-clear" class="static-field">On next browser start</div>
+          <div id="next-clear" class="static-field">—</div>
         </div>
       </div>
       <button id="clear-cache" type="button" class="primary">Clear cache now</button>
       <p class="hint">
-        “Day”, “Week” and “Month” clear on the first browser start of each new day, week (starting Monday) and month.
-        A manual clear also restarts the period. Only cached files are removed — cookies, history, passwords and site data are untouched.
+        “Day”, “Week” and “Month” clear at the start of each new day, week (starting Monday) and month, even while the
+        browser stays open. If the current period has no clear yet — including the very first time — it runs immediately;
+        a clear missed while the browser was closed runs at the next start. A manual clear also restarts the period.
+        Only cached files are removed — cookies, history, passwords and site data are untouched.
       </p>
     </section>
+
+    <!-- TESTING ONLY: remove this whole section (and the matching JS in options.js). -->
+    <!-- section class="card test-only" aria-labelledby="h-test">
+      <div class="card-head">
+        <h2 id="h-test">Cache clear test</h2>
+        <span class="badge page">Testing only</span>
+      </div>
+      <form id="test-clear-form" novalidate>
+        <div class="grid">
+          <label class="field" for="test-clear-delay">
+            <span>Run after</span>
+            <input id="test-clear-delay" type="number" step="1" min="1" value="10" inputmode="numeric">
+          </label>
+          <label class="field" for="test-clear-unit">
+            <span>Unit</span>
+            <select id="test-clear-unit">
+              <option value="seconds" selected>Seconds</option>
+              <option value="minutes">Minutes</option>
+              <option value="hours">Hours</option>
+            </select>
+          </label>
+        </div>
+        <div class="test-clear-actions">
+          <button id="test-clear-schedule" type="submit" class="primary">Schedule</button>
+          <button id="test-clear-cancel" type="button" disabled>Cancel</button>
+        </div>
+        <p id="test-clear-error" class="error" role="alert" hidden></p>
+      </form>
+      <div class="field test-clear-status">
+        <span>Test clear</span>
+        <div id="test-clear-status" class="static-field">No test scheduled</div>
+      </div>
+      <p class="hint">
+        Testing only — remove this card before release. Injects the chosen time as the next cache-clear
+        period; the production scheduler and its real <code>cache-clear-due</code> alarm do the rest
+        (automatic cache clearing must be enabled). You can close this page or restart the browser; a
+        test clear also resets the normal “Last cleared” period.
+      </p>
+    </section> -->
 
     <footer>
       <div class="footer-actions">

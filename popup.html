@@ -1,0 +1,40 @@
+<!doctype html>
+<!-- SPDX-License-Identifier: GPL-3.0-only · Copyright (C) OmAr-Kader -->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Sturdy: Browser Cleaner</title>
+  <link rel="stylesheet" href="popup.css">
+  <script type="module" src="popup.js"></script>
+</head>
+<body>
+  <main>
+    <header>
+      <img src="icon.png" alt="" width="16" height="16">
+      <h1>Sturdy: Browser Cleaner</h1>
+    </header>
+
+    <div id="panel" role="status" aria-live="polite">
+      <!-- A cache clear is running. -->
+      <section id="cleaning" hidden>
+        <span class="spinner" aria-hidden="true"></span>
+        <div class="text">
+          <p class="title">Cleaning…</p>
+          <p class="sub">Clearing cached files.</p>
+        </div>
+      </section>
+
+      <!-- The clear finished. -->
+      <section id="done" hidden>
+        <span class="check-badge" aria-hidden="true">✓</span>
+        <div class="text">
+          <p class="title">Cache cleaned successfully</p>
+          <p class="sub" id="done-at"></p>
+        </div>
+      </section>
+    </div>
+
+    <button id="ok" type="button" class="primary" hidden>OK</button>
+  </main>
+</body>
+</html>
